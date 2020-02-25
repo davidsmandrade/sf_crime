@@ -1,0 +1,4 @@
+##Git Ignore File
+radio_code.json
+police-department-calls-for-service.json
+*.json
