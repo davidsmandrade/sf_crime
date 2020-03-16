@@ -4,13 +4,13 @@
 
 ### Consumer
 
-![Consumer](https://drive.google.com/file/d/1vJDfJIHaz0efHUAz-Hl4bRiMcGHev7tC/view?usp=sharing)
+![link](https://drive.google.com/file/d/1vJDfJIHaz0efHUAz-Hl4bRiMcGHev7tC/view?usp=sharing)
 
 ### Spark Streaming
 
 ![Spark 1](images/sf_crime_spark1.png)
 ![Spark 2](images/sf_crime_spark2.png)
-![Spark3](https://drive.google.com/file/d/1_FFmI3BelGOUVBkGiE_3nJfG291Ogz1S/view?usp=sharing)
+![link](https://drive.google.com/file/d/1_FFmI3BelGOUVBkGiE_3nJfG291Ogz1S/view?usp=sharing)
 
 ### Questions
 
