@@ -7,20 +7,20 @@ import pyspark.sql.functions as psf
 
 #Create a schema for incoming resources
 schema = StructType([
-    StructField("crime_id", StringType(), True),
-    StructField("original_crime_type_name", StringType(), False),
-    StructField("report_date", StringType(), True),
-    StructField("call_date", StringType(), True),
-    StructField("offense_date", StringType(), True),
-    StructField("call_time", StringType(), True),
-    StructField("call_date_time", StringType(), False),
-    StructField("disposition", StringType(), True),
-    StructField("address", StringType(), True),
-    StructField("city", StringType(), True),
-    StructField("state", StringType(), True),
-    StructField("agency_id", StringType(), True),
-    StructField("address_type", StringType(), True),
-    StructField("common_location", StringType(), True)
+        StructField("crime_id", StringType(), False),
+        StructField("original_crime_type_name", StringType(), True),
+        StructField("report_date", TimestampType(), True),
+        StructField("call_date", TimestampType(), True),
+        StructField("offense_date", TimestampType(), True),
+        StructField("call_time", StringType(), True),
+        StructField("call_date_time", TimestampType(), True),
+        StructField("disposition", StringType(), True),
+        StructField("address", StringType(), True),
+        StructField("city", StringType(), True),
+        StructField("state", StringType(), True),
+        StructField("agency_id", StringType(), True),
+        StructField("address_type", StringType(), True),
+        StructField("common_location", StringType(), True)
 ])
 
 def run_spark_job(spark):
@@ -39,6 +39,7 @@ def run_spark_job(spark):
         .load()
 
     # Show schema for the incoming resources for checks
+    logging.debug("Printing schema of incoming data")
     df.printSchema()
 
     # extract the correct column from the kafka input resources
@@ -51,41 +52,47 @@ def run_spark_job(spark):
 
     # select original_crime_type_name and disposition
     distinct_table = service_table \
-        .select("original_crime_type_name", "disposition") \
+        .select("original_crime_type_name", "disposition", "call_date_time") \
         .distinct()
 
     # count the number of original crime type
     agg_df = distinct_table \
         .dropna() \
-        .select("original_crime_type_name") \
-        .groupby("original_crime_type_name") \
-        .agg({"original_crime_type_name" : "count"}) \
-        .orderBy("count(original_crime_type_name)", ascending=False)
+        .select("original_crime_type_name","call_date_time") \
+        .withWatermark("call_date_time", "90 minutes") \
+        .groupby("original_crime_type_name").count().sort("count", ascending=False)
 
     # Q1. Submit a screen shot of a batch ingestion of the aggregation
     # write output stream
+    logger.info("Streaming crime types and descriptions")
     query = agg_df \
         .writeStream \
         .format('console') \
         .outputMode('Complete') \
         .trigger(processingTime="10 seconds") \
+        .option("truncate", "false") \
         .start()
 
 
-    # TODO attach a ProgressReporter
+    #attach a ProgressReporter
+    print('=== awaitTermination')
     query.awaitTermination()
 
+    print('=== radio_code....')
+
     # get the right radio code json path
+    logger.debug("Reading static data from disk")
     radio_code_json_filepath = "radio_code.json"
     radio_code_df = spark.read.json(radio_code_json_filepath)
 
     # clean up your data so that the column names match on radio_code_df and agg_df
     # we will want to join on the disposition code
 
-    # TODO rename disposition_code column to disposition
+    #rename disposition_code column to disposition
     radio_code_df = radio_code_df.withColumnRenamed("disposition_code", "disposition")
 
     #join on disposition column
+    logger.debug("Joining aggregated data and radio codes")
     join_query = agg_df \
         .join(radio_code_df, col("agg_df.disposition") == col("radio_code_df.disposition"), "left_outer")
 
@@ -105,7 +112,7 @@ if __name__ == "__main__":
         .getOrCreate()
 
     logger.info("Spark started")
-
     run_spark_job(spark)
 
+    logger.info("Closing Spark Session")
     spark.stop()
